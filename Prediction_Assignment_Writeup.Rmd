@@ -1,0 +1,102 @@
+---
+title: "Prediction Assignment Writeup"
+author: "suwei"
+date: "2018-1-9"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache=TRUE, message = FALSE)
+```
+### Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+
+### Data
+
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+
+### Library
+
+Using caret package to analysis. if the package isn't in your environment, it will automatically Install it.
+
+```{r}
+libs <- c("caret")
+for (i in libs){
+  if( !is.element(i, .packages(all.available = TRUE)) ) {
+    install.packages(i)
+  }
+  library(i,character.only = TRUE)
+}
+
+sessionInfo()
+```
+
+### Data loading and checking
+
+Get the data into r environment.
+
+```{r}
+# Data loading
+training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+testing <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+
+# Na and no value column counting
+naCount <- sapply(1:ncol(training), function(x){sum(is.na(training[ ,x]))+sum(training[, x] == "")})
+
+# Getting new data frame
+new_training <- data.frame(training[, which(naCount == 0)])
+new_testing <- data.frame(testing[, which(naCount == 0)])
+
+# Remove those columns which are not quiet useful in prediction
+new_training <- new_training[, 8:ncol(new_training)]
+new_testing <- new_testing[, 8:ncol(new_testing)]
+```
+
+### Data Partitioning
+
+First, we can split the original training data in two part. 70% for training and 30% for testing.
+
+```{r}
+set.seed(1)
+inTrain <- createDataPartition(new_training$classe, p=0.70, list=F)
+trainData <- new_training[inTrain, ]
+testData <- new_training[-inTrain, ]
+```
+
+### Model building
+
+Apply random forest on the training set and use 10 fold cross validation.
+
+```{r}
+setting <- trainControl(method="cv", 10)
+modelRandomForest <- train(classe ~ ., data = trainData, method = "rf", trControl = setting)
+modelRandomForest
+```
+
+### Predicting
+
+We can use the model to predict the data in `testData` which was splited from the original `train` dataset.
+
+```{r}
+predict <- predict(modelRandomForest, testData)
+result <- confusionMatrix(testData$classe, predict)
+result
+```
+
+From the model, we can know the accuracy is `r result$overall[[1]]*100` % and the error is `r (1-result$overall[[1]])*100`%.
+
+Next, we use the model to predict data which isn't knowing the classes.
+
+```{r}
+predictTest <- predict(modelRandomForest, new_testing)
+predictTest
+```
